@@ -112,6 +112,39 @@ Stop and clean the Docker environment:
 docker compose down -v
 ```
 
+## GitHub Actions CI
+
+The repository includes two GitHub Actions workflows:
+
+- `CI`: runs on push and pull request to `main`; compiles all Java source sets with Dockerized Gradle.
+- `Mobile E2E`: manual workflow that downloads the APK, starts the Docker Android/Appium stack, runs the selected mobile suite, generates Allure, and uploads test evidence.
+
+The APK is not committed to git. Configure one of these APK sources before running `Mobile E2E`:
+
+Option A, recommended when the original release asset has a stable URL:
+
+```bash
+gh secret set APK_DOWNLOAD_URL --body "https://example.com/path/to/app-home-test-mobile.apk"
+gh variable set APK_SHA256 --body "F0C27753CEEE2E7BEED9C3F28760BB94BE4282FABDE5E02902B578D4D7A52A7E"
+```
+
+Option B, use a GitHub Release asset in this same repository:
+
+```bash
+gh release create mobile-apk app-home-test-mobile.apk --title "Mobile APK" --notes "APK consumed by the Mobile E2E workflow."
+gh variable set APK_RELEASE_TAG --body "mobile-apk"
+gh variable set APK_SHA256 --body "F0C27753CEEE2E7BEED9C3F28760BB94BE4282FABDE5E02902B578D4D7A52A7E"
+```
+
+Run the mobile workflow from GitHub Actions and choose one suite:
+
+- `plain`
+- `cucumber`
+- `all`
+- `performance`
+
+Allure results, screenshots, animated recordings, JUnit/Cucumber reports, and Docker logs are uploaded as workflow artifacts.
+
 ## Run Locally Without Docker
 
 If you already have Java 17, Gradle, Android SDK, an Android emulator/device, and Appium 2 installed:
