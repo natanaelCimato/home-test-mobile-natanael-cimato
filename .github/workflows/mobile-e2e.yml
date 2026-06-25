@@ -117,4 +117,22 @@ jobs:
 
       - name: Stop Docker environment
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose down -v --remove-orphans || true
+
+      - name: Notify chat reporters
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          NOTIFICATION_STATUS: ${{ job.status }}
+          NOTIFICATION_WORKFLOW: ${{ github.workflow }}
+          NOTIFICATION_JOB: mobile
+          NOTIFICATION_SUITE: ${{ inputs.suite }}
+          NOTIFICATION_REPOSITORY: ${{ github.repository }}
+          NOTIFICATION_BRANCH: ${{ github.ref_name }}
+          NOTIFICATION_SHA: ${{ github.sha }}
+          NOTIFICATION_ACTOR: ${{ github.actor }}
+          NOTIFICATION_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NOTIFICATION_ARTIFACTS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/notify-chat.sh
