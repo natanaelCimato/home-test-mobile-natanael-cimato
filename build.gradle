@@ -1,0 +1,136 @@
+plugins {
+    id 'java'
+    id 'io.qameta.allure' version '2.12.0'
+}
+
+group = 'com.homechallenge'
+version = '1.0.0'
+
+ext {
+    appiumJavaClientVersion = '10.1.1'
+    cucumberVersion = '7.34.3'
+    junitVersion = '5.14.2'
+    seleniumVersion = '4.42.0'
+    allureVersion = '2.29.1'
+    allureCommandlineVersion = '2.29.0'
+    slf4jVersion = '2.0.17'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+sourceSets {
+    cucumberTest {
+        java.srcDirs = ['src/cucumberTest/java']
+        resources.srcDirs = ['src/cucumberTest/resources']
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
+    performanceTest {
+        java.srcDirs = ['src/performanceTest/java']
+        resources.srcDirs = ['src/performanceTest/resources']
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+configurations {
+    cucumberTestImplementation.extendsFrom implementation, testImplementation
+    cucumberTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
+    performanceTestImplementation.extendsFrom implementation, testImplementation
+    performanceTestRuntimeOnly.extendsFrom runtimeOnly, testRuntimeOnly
+}
+
+dependencies {
+    implementation "io.appium:java-client:${appiumJavaClientVersion}"
+    implementation platform("org.junit:junit-bom:${junitVersion}")
+    implementation 'org.junit.jupiter:junit-jupiter-api'
+    implementation "io.qameta.allure:allure-java-commons:${allureVersion}"
+
+    constraints {
+        implementation("org.seleniumhq.selenium:selenium-api:${seleniumVersion}")
+        implementation("org.seleniumhq.selenium:selenium-remote-driver:${seleniumVersion}")
+        implementation("org.seleniumhq.selenium:selenium-support:${seleniumVersion}")
+    }
+
+    testImplementation platform("org.junit:junit-bom:${junitVersion}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
+    testImplementation "io.qameta.allure:allure-junit5:${allureVersion}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
+
+    cucumberTestImplementation platform("org.junit:junit-bom:${junitVersion}")
+    cucumberTestImplementation platform("io.cucumber:cucumber-bom:${cucumberVersion}")
+    cucumberTestImplementation 'io.cucumber:cucumber-java'
+    cucumberTestImplementation 'io.cucumber:cucumber-junit-platform-engine'
+    cucumberTestImplementation 'org.junit.platform:junit-platform-suite'
+    cucumberTestImplementation 'org.junit.jupiter:junit-jupiter-api'
+    cucumberTestImplementation "io.qameta.allure:allure-cucumber7-jvm:${allureVersion}"
+    cucumberTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    cucumberTestRuntimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
+
+    performanceTestImplementation platform("org.junit:junit-bom:${junitVersion}")
+    performanceTestImplementation 'org.junit.jupiter:junit-jupiter'
+    performanceTestImplementation "io.qameta.allure:allure-junit5:${allureVersion}"
+    performanceTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    performanceTestRuntimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
+}
+
+allure {
+    version = allureCommandlineVersion
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    maxParallelForks = 1
+
+    systemProperty 'appium.serverUrl', System.getProperty('appium.serverUrl', System.getenv('APPIUM_SERVER_URL') ?: 'http://127.0.0.1:4723/')
+    systemProperty 'appium.app', System.getProperty('appium.app', System.getenv('APP_PATH') ?: file('app-home-test-mobile.apk').absolutePath)
+    systemProperty 'appium.deviceName', System.getProperty('appium.deviceName', System.getenv('DEVICE_NAME') ?: 'Android Emulator')
+    systemProperty 'appium.platformVersion', System.getProperty('appium.platformVersion', System.getenv('ANDROID_PLATFORM_VERSION') ?: '')
+    systemProperty 'appium.skipAppInstall', System.getProperty('appium.skipAppInstall', System.getenv('SKIP_APP_INSTALL') ?: 'false')
+    systemProperty 'allure.results.directory', System.getProperty('allure.results.directory', file("$buildDir/allure-results").absolutePath)
+    systemProperty 'evidence.video.enabled', System.getProperty('evidence.video.enabled', System.getenv('RECORD_VIDEO') ?: 'false')
+    systemProperty 'evidence.video.maxSeconds', System.getProperty('evidence.video.maxSeconds', System.getenv('VIDEO_TIME_LIMIT_SECONDS') ?: '180')
+    systemProperty 'performance.loginBudgetSeconds', System.getProperty('performance.loginBudgetSeconds', System.getenv('PERF_LOGIN_BUDGET_SECONDS') ?: '600')
+    systemProperty 'performance.catalogBudgetSeconds', System.getProperty('performance.catalogBudgetSeconds', System.getenv('PERF_CATALOG_BUDGET_SECONDS') ?: '420')
+
+    testLogging {
+        events 'PASSED', 'FAILED', 'SKIPPED'
+        exceptionFormat 'full'
+        showStandardStreams = true
+    }
+}
+
+tasks.named('test') {
+    description = 'Runs the Appium scenarios without Cucumber using JUnit 5.'
+    group = 'verification'
+}
+
+tasks.register('cucumberTest', Test) {
+    description = 'Runs the Appium scenarios with Cucumber.'
+    group = 'verification'
+    testClassesDirs = sourceSets.cucumberTest.output.classesDirs
+    classpath = sourceSets.cucumberTest.runtimeClasspath
+    shouldRunAfter tasks.named('test')
+
+    systemProperty 'cucumber.plugin', 'pretty, io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm, html:build/reports/cucumber/cucumber.html, json:build/reports/cucumber/cucumber.json'
+}
+
+tasks.register('performanceTest', Test) {
+    description = 'Runs Appium performance smoke tests with generous Docker software-emulator budgets.'
+    group = 'verification'
+    testClassesDirs = sourceSets.performanceTest.output.classesDirs
+    classpath = sourceSets.performanceTest.runtimeClasspath
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('allMobileTests') {
+    description = 'Runs both the plain JUnit suite and the Cucumber suite.'
+    group = 'verification'
+    dependsOn tasks.named('test'), tasks.named('cucumberTest')
+}
