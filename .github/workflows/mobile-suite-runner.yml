@@ -50,6 +50,21 @@ jobs:
           docker version
           docker compose version
 
+      - name: Enable KVM
+        run: |
+          set -euo pipefail
+
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::/dev/kvm is not available on this runner. Android emulator CI needs KVM hardware acceleration."
+            exit 1
+          fi
+
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
       - name: Resolve APK
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,36 +94,65 @@ jobs:
             exit 1
           fi
 
+      - name: Start Android emulator
+        run: |
+          set -euo pipefail
+          compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
+          "${compose[@]}" up -d android
+
+      - name: Wait for Android emulator
+        run: |
+          set -euo pipefail
+          compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
+          deadline=$((SECONDS + 1800))
+
+          while [ "${SECONDS}" -lt "${deadline}" ]; do
+            status="$(docker inspect -f '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}{{ .State.Status }}{{ end }}' home-test-mobile-android 2>/dev/null || echo missing)"
+            echo "Android health: ${status} at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+            if [ "${status}" = "healthy" ]; then
+              exit 0
+            fi
+
+            "${compose[@]}" logs --no-color --tail=80 android || true
+            sleep 30
+          done
+
+          echo "::error::Android emulator did not become healthy within 30 minutes."
+          docker inspect home-test-mobile-android || true
+          "${compose[@]}" logs --no-color android || true
+          exit 1
+
       - name: Run ${{ inputs.suite }} suite
         run: |
           set -euo pipefail
 
+          compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
           compose_profile="${{ inputs.compose_profile }}"
           compose_service="${{ inputs.compose_service }}"
+          profile_args=()
 
           if [ -n "${compose_profile}" ]; then
-            docker compose --profile "${compose_profile}" up \
-              --abort-on-container-exit \
-              --exit-code-from "${compose_service}" \
-              "${compose_service}"
-          else
-            docker compose up \
-              --abort-on-container-exit \
-              --exit-code-from "${compose_service}" \
-              "${compose_service}"
+            profile_args=(--profile "${compose_profile}")
           fi
+
+          "${compose[@]}" "${profile_args[@]}" up \
+            --no-deps \
+            --abort-on-container-exit \
+            --exit-code-from "${compose_service}" \
+            "${compose_service}"
 
       - name: Collect Docker logs
         if: always()
         run: |
           mkdir -p build/ci-diagnostics
-          docker compose ps > build/ci-diagnostics/docker-compose-ps.txt || true
-          docker compose logs --no-color > build/ci-diagnostics/docker-compose.log || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps > build/ci-diagnostics/docker-compose-ps.txt || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > build/ci-diagnostics/docker-compose.log || true
 
       - name: Generate Allure report
         if: always()
         run: |
-          docker compose --profile report run --rm allure-report || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml --profile report run --rm allure-report || true
 
       - name: Upload test evidence
         if: always()
@@ -125,7 +169,7 @@ jobs:
 
       - name: Stop Docker environment
         if: always()
-        run: docker compose down -v --remove-orphans || true
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
 
       - name: Notify Slack
         if: always()

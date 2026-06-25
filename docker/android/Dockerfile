@@ -1,8 +1,10 @@
 FROM budtmo/docker-android:emulator_11.0
 
+ARG SOFTWARE_ACCELERATION=true
+
 USER root
 
-RUN python3 - <<'PY'
+RUN cat > /tmp/patch-emulator.py <<'PY'
 from pathlib import Path
 
 path = Path("/home/androidusr/docker-android/cli/src/device/emulator.py")
@@ -17,5 +19,11 @@ source = source.replace(
 )
 path.write_text(source)
 PY
+
+RUN if [ "${SOFTWARE_ACCELERATION}" = "true" ]; then \
+      python3 /tmp/patch-emulator.py; \
+    else \
+      echo "Keeping upstream KVM/hardware acceleration checks enabled"; \
+    fi && rm /tmp/patch-emulator.py
 
 USER androidusr

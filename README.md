@@ -107,6 +107,7 @@ The repository includes four GitHub Actions workflows:
 - `Performance Suite`: manual workflow that runs the mobile performance smoke suite.
 
 The three mobile suite workflows share the reusable `Mobile Suite Runner`, which downloads the APK, starts the Docker Android/Appium stack, runs the selected suite, generates Allure, sends Slack notifications, and uploads test evidence.
+In GitHub Actions the runner uses `docker-compose.ci.yml` to enable `/dev/kvm` and keep Android emulator hardware acceleration on. Local Docker runs use the default Compose file, which keeps the Windows-compatible no-KVM fallback.
 
 The APK is not committed to git. Configure one of these APK sources before running the mobile workflows:
 

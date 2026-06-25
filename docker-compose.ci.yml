@@ -1,0 +1,8 @@
+services:
+  android:
+    build:
+      args:
+        SOFTWARE_ACCELERATION: "false"
+    privileged: true
+    devices:
+      - /dev/kvm:/dev/kvm

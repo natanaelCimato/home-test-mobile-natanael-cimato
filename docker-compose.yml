@@ -26,9 +26,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "adb devices | grep -q 'emulator-[0-9][0-9]*[[:space:]]*device' && adb shell getprop sys.boot_completed | grep -q 1 && { [ -f /tmp/android-prepared ] || (adb shell settings put global package_verifier_enable 0 || true; adb shell settings put global verifier_verify_adb_installs 0 || true; adb shell settings put secure user_setup_complete 1 || true; adb shell settings put global device_provisioned 1 || true; adb shell settings put global window_animation_scale 0 || true; adb shell settings put global transition_animation_scale 0 || true; adb shell settings put global animator_duration_scale 0 || true; touch /tmp/android-prepared); } && { adb shell pm path com.learnautomationapp >/dev/null 2>&1 || adb install -g -r /workspace/app-home-test-mobile.apk >/tmp/app-home-install.log 2>&1; }"]
       interval: 10s
-      timeout: 300s
-      retries: 90
-      start_period: 30s
+      timeout: 60s
+      retries: 45
+      start_period: 60s
 
   tests:
     image: gradle:8-jdk17
