@@ -47,6 +47,13 @@ jobs:
           compileCucumberTestJava
           compilePerformanceTestJava
 
+      - name: Normalize Gradle cache permissions
+        if: always()
+        run: |
+          sudo rm -rf .ci-gradle-cache/daemon .ci-gradle-cache/workers .ci-gradle-cache/native
+          sudo chown -R "$(id -u):$(id -g)" .ci-gradle-cache
+          sudo chmod -R u+rwX,go+rX .ci-gradle-cache
+
       - name: Notify Slack
         if: always()
         env:

@@ -185,6 +185,13 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml --profile report run --rm allure-report || true
 
+      - name: Normalize generated file permissions
+        if: always()
+        run: |
+          sudo rm -rf .ci-gradle-cache/daemon .ci-gradle-cache/workers .ci-gradle-cache/native
+          sudo chown -R "$(id -u):$(id -g)" .ci-gradle-cache build || true
+          sudo chmod -R u+rwX,go+rX .ci-gradle-cache build || true
+
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v7.0.1
