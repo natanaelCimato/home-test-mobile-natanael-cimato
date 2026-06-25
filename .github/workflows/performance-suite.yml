@@ -1,0 +1,23 @@
+name: Performance Suite
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: performance-suite-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  performance:
+    name: Run Performance suite
+    uses: ./.github/workflows/mobile-suite-runner.yml
+    with:
+      suite: performance
+      compose_profile: performance
+      compose_service: tests-performance
+      artifact_prefix: mobile-evidence-performance
+      timeout_minutes: 120
+    secrets: inherit

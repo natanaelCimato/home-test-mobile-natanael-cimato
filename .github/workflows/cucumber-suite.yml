@@ -1,0 +1,23 @@
+name: Cucumber Suite
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: cucumber-suite-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cucumber:
+    name: Run Cucumber suite
+    uses: ./.github/workflows/mobile-suite-runner.yml
+    with:
+      suite: cucumber
+      compose_profile: cucumber
+      compose_service: tests-cucumber
+      artifact_prefix: mobile-evidence-cucumber
+      timeout_minutes: 120
+    secrets: inherit

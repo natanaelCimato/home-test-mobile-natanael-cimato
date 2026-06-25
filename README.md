@@ -94,12 +94,16 @@ docker compose down -v
 
 ## GitHub Actions CI
 
-The repository includes two GitHub Actions workflows:
+The repository includes four GitHub Actions workflows:
 
 - `CI`: runs on push and pull request to `main`; compiles all Java source sets with Dockerized Gradle.
-- `Mobile E2E`: manual workflow that downloads the APK, starts the Docker Android/Appium stack, runs the selected mobile suite, generates Allure, and uploads test evidence.
+- `E2E Suite`: manual workflow that runs the plain JUnit/Appium end-to-end suite.
+- `Cucumber Suite`: manual workflow that runs the Cucumber/Appium suite.
+- `Performance Suite`: manual workflow that runs the mobile performance smoke suite.
 
-The APK is not committed to git. Configure one of these APK sources before running `Mobile E2E`:
+The three mobile suite workflows share the reusable `Mobile Suite Runner`, which downloads the APK, starts the Docker Android/Appium stack, runs the selected suite, generates Allure, sends Slack notifications, and uploads test evidence.
+
+The APK is not committed to git. Configure one of these APK sources before running the mobile workflows:
 
 Option A, recommended when the original release asset has a stable URL:
 
@@ -111,17 +115,24 @@ gh variable set APK_SHA256 --body "***REMOVED***"
 Option B, use a GitHub Release asset in this same repository:
 
 ```bash
-gh release create mobile-apk app-home-test-mobile.apk --title "Mobile APK" --notes "APK consumed by the Mobile E2E workflow."
+gh release create mobile-apk app-home-test-mobile.apk --title "Mobile APK" --notes "APK consumed by the mobile suite workflows."
 gh variable set APK_RELEASE_TAG --body "mobile-apk"
 gh variable set APK_SHA256 --body "***REMOVED***"
 ```
 
-Run the mobile workflow from GitHub Actions and choose one suite:
+Run each mobile workflow from GitHub Actions, or trigger them from the CLI:
 
-- `plain`
-- `cucumber`
-- `all`
-- `performance`
+```bash
+gh workflow run "E2E Suite"
+gh workflow run "Cucumber Suite"
+gh workflow run "Performance Suite"
+```
+
+Available suite workflows:
+
+- `E2E Suite`: plain JUnit 5 implementation
+- `Cucumber Suite`: BDD implementation
+- `Performance Suite`: login and deep-catalog timing checks
 
 Allure results, screenshots, animated recordings, JUnit/Cucumber reports, and Docker logs are uploaded as workflow artifacts.
 

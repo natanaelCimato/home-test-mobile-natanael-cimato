@@ -1,136 +1,23 @@
-name: Mobile E2E
+name: E2E Suite
 
 on:
   workflow_dispatch:
-    inputs:
-      suite:
-        description: Suite to run
-        required: true
-        default: plain
-        type: choice
-        options:
-          - plain
-          - cucumber
-          - all
-          - performance
+
+concurrency:
+  group: e2e-suite-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
-env:
-  APK_FILE: app-home-test-mobile.apk
-  APK_RELEASE_TAG: ${{ vars.APK_RELEASE_TAG || 'mobile-apk' }}
-  APK_DOWNLOAD_URL: ${{ secrets.APK_DOWNLOAD_URL || vars.APK_DOWNLOAD_URL }}
-  EXPECTED_APK_SHA256: ${{ vars.APK_SHA256 || '' }}
-
 jobs:
-  mobile:
-    name: Run ${{ inputs.suite }} suite
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.0
-
-      - name: Show Docker versions
-        run: |
-          docker version
-          docker compose version
-
-      - name: Resolve APK
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          if [ -n "${APK_DOWNLOAD_URL:-}" ]; then
-            echo "Downloading APK from APK_DOWNLOAD_URL."
-            curl --fail --location --retry 3 --retry-delay 10 \
-              --output "${APK_FILE}" \
-              "${APK_DOWNLOAD_URL}"
-          else
-            echo "APK_DOWNLOAD_URL is not configured. Downloading ${APK_FILE} from release tag ${APK_RELEASE_TAG}."
-            gh release download "${APK_RELEASE_TAG}" \
-              --repo "${GITHUB_REPOSITORY}" \
-              --pattern "${APK_FILE}" \
-              --dir .
-          fi
-
-          test -s "${APK_FILE}"
-          actual_sha="$(sha256sum "${APK_FILE}" | awk '{print toupper($1)}')"
-          expected_sha="$(echo "${EXPECTED_APK_SHA256}" | tr '[:lower:]' '[:upper:]')"
-
-          echo "APK SHA-256: ${actual_sha}"
-          if [ -n "${expected_sha}" ] && [ "${actual_sha}" != "${expected_sha}" ]; then
-            echo "Expected SHA-256 ${expected_sha}, got ${actual_sha}."
-            exit 1
-          fi
-
-      - name: Run mobile suite
-        run: |
-          set -euo pipefail
-
-          case "${{ inputs.suite }}" in
-            plain)
-              docker compose up --abort-on-container-exit --exit-code-from tests tests
-              ;;
-            cucumber)
-              docker compose --profile cucumber up --abort-on-container-exit --exit-code-from tests-cucumber tests-cucumber
-              ;;
-            all)
-              docker compose --profile all up --abort-on-container-exit --exit-code-from tests-all tests-all
-              ;;
-            performance)
-              docker compose --profile performance up --abort-on-container-exit --exit-code-from tests-performance tests-performance
-              ;;
-            *)
-              echo "Unknown suite: ${{ inputs.suite }}"
-              exit 1
-              ;;
-          esac
-
-      - name: Collect Docker logs
-        if: always()
-        run: |
-          mkdir -p build/ci-diagnostics
-          docker compose ps > build/ci-diagnostics/docker-compose-ps.txt || true
-          docker compose logs --no-color > build/ci-diagnostics/docker-compose.log || true
-
-      - name: Generate Allure report
-        if: always()
-        run: |
-          docker compose --profile report run --rm allure-report || true
-
-      - name: Upload test evidence
-        if: always()
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: mobile-evidence-${{ inputs.suite }}-${{ github.run_number }}
-          path: |
-            build/allure-results/**
-            build/reports/**
-            build/test-results/**
-            build/ci-diagnostics/**
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Stop Docker environment
-        if: always()
-        run: docker compose down -v --remove-orphans || true
-
-      - name: Notify Slack
-        if: always()
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          NOTIFICATION_STATUS: ${{ job.status }}
-          NOTIFICATION_WORKFLOW: ${{ github.workflow }}
-          NOTIFICATION_JOB: mobile
-          NOTIFICATION_SUITE: ${{ inputs.suite }}
-          NOTIFICATION_REPOSITORY: ${{ github.repository }}
-          NOTIFICATION_BRANCH: ${{ github.ref_name }}
-          NOTIFICATION_SHA: ${{ github.sha }}
-          NOTIFICATION_ACTOR: ${{ github.actor }}
-          NOTIFICATION_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          NOTIFICATION_ARTIFACTS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash .github/scripts/notify-slack.sh
+  e2e:
+    name: Run E2E suite
+    uses: ./.github/workflows/mobile-suite-runner.yml
+    with:
+      suite: e2e
+      compose_profile: ""
+      compose_service: tests
+      artifact_prefix: mobile-evidence-e2e
+      timeout_minutes: 120
+    secrets: inherit
