@@ -1,0 +1,42 @@
+# Build and dependency caches
+.gradle/
+build/
+out/
+target/
+
+# IDE and local tooling
+.idea/
+.vscode/
+*.iml
+.codex/
+.agents/
+
+# Local machine configuration
+.env
+.env.*
+local.properties
+
+# Mobile binaries and signing material
+*.apk
+*.aab
+*.apks
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# Test reports and evidence generated locally
+allure-results/
+allure-report/
+reports/
+recordings/
+screenshots/
+videos/
+test-output/
+
+# Logs, dumps, and OS noise
+*.log
+*.hprof
+hs_err_pid*
+.DS_Store
+Thumbs.db

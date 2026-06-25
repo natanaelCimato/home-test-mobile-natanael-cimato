@@ -1,0 +1,137 @@
+services:
+  android:
+    build:
+      context: .
+      dockerfile: docker/android/Dockerfile
+    image: home-test-mobile/android-emulator:11.0-windows
+    container_name: home-test-mobile-android
+    ports:
+      - "4723:4723"
+      - "6080:6080"
+    environment:
+      EMULATOR_DEVICE: "Nexus 5"
+      EMULATOR_ANDROID_VERSION: "11.0"
+      EMULATOR_NO_SKIN: "true"
+      EMULATOR_DATA_PARTITION: "2048m"
+      EMULATOR_ADDITIONAL_ARGS: "-no-snapshot -no-metrics -camera-back none -camera-front none -memory 1536"
+      SCREEN_WIDTH: "720"
+      SCREEN_HEIGHT: "1280"
+      SCREEN_DEPTH: "24"
+      WEB_VNC: "true"
+      APPIUM: "true"
+      APPIUM_ADDITIONAL_ARGS: "--base-path / --relaxed-security"
+    volumes:
+      - ./app-home-test-mobile.apk:/workspace/app-home-test-mobile.apk:ro
+    healthcheck:
+      test: ["CMD-SHELL", "adb devices | grep -q 'emulator-[0-9][0-9]*[[:space:]]*device' && adb shell getprop sys.boot_completed | grep -q 1 && { [ -f /tmp/android-prepared ] || (adb shell settings put global package_verifier_enable 0 || true; adb shell settings put global verifier_verify_adb_installs 0 || true; adb shell settings put secure user_setup_complete 1 || true; adb shell settings put global device_provisioned 1 || true; adb shell settings put global window_animation_scale 0 || true; adb shell settings put global transition_animation_scale 0 || true; adb shell settings put global animator_duration_scale 0 || true; touch /tmp/android-prepared); } && { adb shell pm path com.learnautomationapp >/dev/null 2>&1 || adb install -g -r /workspace/app-home-test-mobile.apk >/tmp/app-home-install.log 2>&1; }"]
+      interval: 10s
+      timeout: 300s
+      retries: 90
+      start_period: 30s
+
+  tests:
+    image: gradle:8-jdk17
+    working_dir: /workspace
+    depends_on:
+      android:
+        condition: service_healthy
+    environment:
+      APPIUM_SERVER_URL: "http://android:4723/"
+      APP_PATH: "/workspace/app-home-test-mobile.apk"
+      SKIP_APP_INSTALL: "true"
+      WAIT_SECONDS: "180"
+      RECORD_VIDEO: "true"
+      VIDEO_TIME_LIMIT_SECONDS: "60"
+      DEVICE_NAME: "Nexus 5"
+      ANDROID_PLATFORM_VERSION: "11.0"
+    volumes:
+      - ./:/workspace
+      - gradle-cache:/home/gradle/.gradle
+    entrypoint: ["bash", "-lc"]
+    command:
+      - "bash scripts/wait-for-appium.sh http://android:4723/status 420 && gradle --no-daemon clean test"
+
+  tests-cucumber:
+    image: gradle:8-jdk17
+    profiles: ["cucumber"]
+    working_dir: /workspace
+    depends_on:
+      android:
+        condition: service_healthy
+    environment:
+      APPIUM_SERVER_URL: "http://android:4723/"
+      APP_PATH: "/workspace/app-home-test-mobile.apk"
+      SKIP_APP_INSTALL: "true"
+      WAIT_SECONDS: "180"
+      RECORD_VIDEO: "true"
+      VIDEO_TIME_LIMIT_SECONDS: "60"
+      DEVICE_NAME: "Nexus 5"
+      ANDROID_PLATFORM_VERSION: "11.0"
+    volumes:
+      - ./:/workspace
+      - gradle-cache:/home/gradle/.gradle
+    entrypoint: ["bash", "-lc"]
+    command:
+      - "bash scripts/wait-for-appium.sh http://android:4723/status 420 && gradle --no-daemon clean cucumberTest"
+
+  tests-all:
+    image: gradle:8-jdk17
+    profiles: ["all"]
+    working_dir: /workspace
+    depends_on:
+      android:
+        condition: service_healthy
+    environment:
+      APPIUM_SERVER_URL: "http://android:4723/"
+      APP_PATH: "/workspace/app-home-test-mobile.apk"
+      SKIP_APP_INSTALL: "true"
+      WAIT_SECONDS: "180"
+      RECORD_VIDEO: "true"
+      VIDEO_TIME_LIMIT_SECONDS: "60"
+      DEVICE_NAME: "Nexus 5"
+      ANDROID_PLATFORM_VERSION: "11.0"
+    volumes:
+      - ./:/workspace
+      - gradle-cache:/home/gradle/.gradle
+    entrypoint: ["bash", "-lc"]
+    command:
+      - "bash scripts/wait-for-appium.sh http://android:4723/status 420 && gradle --no-daemon clean allMobileTests"
+
+  tests-performance:
+    image: gradle:8-jdk17
+    profiles: ["performance"]
+    working_dir: /workspace
+    depends_on:
+      android:
+        condition: service_healthy
+    environment:
+      APPIUM_SERVER_URL: "http://android:4723/"
+      APP_PATH: "/workspace/app-home-test-mobile.apk"
+      SKIP_APP_INSTALL: "true"
+      WAIT_SECONDS: "180"
+      RECORD_VIDEO: "true"
+      VIDEO_TIME_LIMIT_SECONDS: "60"
+      DEVICE_NAME: "Nexus 5"
+      ANDROID_PLATFORM_VERSION: "11.0"
+      PERF_LOGIN_BUDGET_SECONDS: "600"
+      PERF_CATALOG_BUDGET_SECONDS: "420"
+    volumes:
+      - ./:/workspace
+      - gradle-cache:/home/gradle/.gradle
+    entrypoint: ["bash", "-lc"]
+    command:
+      - "bash scripts/wait-for-appium.sh http://android:4723/status 420 && gradle --no-daemon clean performanceTest"
+
+  allure-report:
+    image: gradle:8-jdk17
+    profiles: ["report"]
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      - gradle-cache:/home/gradle/.gradle
+    entrypoint: ["bash", "-lc"]
+    command:
+      - "gradle --no-daemon allureReport"
+
+volumes:
+  gradle-cache:
