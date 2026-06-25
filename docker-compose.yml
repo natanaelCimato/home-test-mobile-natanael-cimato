@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: docker/android/Dockerfile
     image: home-test-mobile/android-emulator:11.0-windows
+    pull_policy: build
     container_name: home-test-mobile-android
     ports:
       - "4723:4723"
