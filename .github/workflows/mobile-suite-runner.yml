@@ -145,7 +145,8 @@ jobs:
       - name: Collect Docker logs
         if: always()
         run: |
-          mkdir -p build/ci-diagnostics
+          sudo mkdir -p build/ci-diagnostics
+          sudo chmod -R a+rwX build
           docker compose -f docker-compose.yml -f docker-compose.ci.yml ps > build/ci-diagnostics/docker-compose-ps.txt || true
           docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > build/ci-diagnostics/docker-compose.log || true
 
