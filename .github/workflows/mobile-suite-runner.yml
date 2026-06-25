@@ -28,12 +28,14 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 env:
   APK_FILE: app-home-test-mobile.apk
   APK_RELEASE_TAG: ${{ vars.APK_RELEASE_TAG || 'mobile-apk' }}
   APK_DOWNLOAD_URL: ${{ secrets.APK_DOWNLOAD_URL || vars.APK_DOWNLOAD_URL }}
   EXPECTED_APK_SHA256: ${{ secrets.APK_SHA256 }}
+  CI_ANDROID_IMAGE: ghcr.io/natanaelcimato/home-test-mobile-natanael-cimato/android-emulator:ci
 
 jobs:
   mobile:
@@ -49,6 +51,26 @@ jobs:
         run: |
           docker version
           docker compose version
+
+      - name: Restore Gradle cache
+        uses: actions/cache@v6.0.0
+        with:
+          path: .ci-gradle-cache
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/settings.gradle', '**/gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Prepare Gradle cache directory
+        run: |
+          mkdir -p .ci-gradle-cache
+          sudo chmod -R a+rwX .ci-gradle-cache
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Enable KVM
         run: |
@@ -85,20 +107,27 @@ jobs:
           fi
 
           test -s "${APK_FILE}"
+          if [ -z "${EXPECTED_APK_SHA256:-}" ]; then
+            echo "::error::APK_SHA256 secret is required to validate the downloaded APK."
+            exit 1
+          fi
+
           actual_sha="$(sha256sum "${APK_FILE}" | awk '{print toupper($1)}')"
           expected_sha="$(echo "${EXPECTED_APK_SHA256}" | tr '[:lower:]' '[:upper:]')"
 
-          echo "APK SHA-256: ${actual_sha}"
-          if [ -n "${expected_sha}" ] && [ "${actual_sha}" != "${expected_sha}" ]; then
-            echo "Expected SHA-256 ${expected_sha}, got ${actual_sha}."
+          if [ "${actual_sha}" != "${expected_sha}" ]; then
+            echo "::error::APK checksum verification failed."
             exit 1
           fi
+
+          echo "APK checksum verified."
 
       - name: Start Android emulator
         run: |
           set -euo pipefail
           compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
-          "${compose[@]}" up -d android
+          "${compose[@]}" pull android
+          "${compose[@]}" up -d --no-build android
 
       - name: Wait for Android emulator
         run: |
@@ -137,6 +166,7 @@ jobs:
           fi
 
           "${compose[@]}" "${profile_args[@]}" up \
+            --no-build \
             --no-deps \
             --abort-on-container-exit \
             --exit-code-from "${compose_service}" \

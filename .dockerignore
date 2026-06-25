@@ -1,5 +1,6 @@
 .git
 .gradle
+.ci-gradle-cache
 build
 out
 target

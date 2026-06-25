@@ -41,6 +41,22 @@ public final class MobileEvidence {
         Allure.parameter("skipAppInstall", config.skipAppInstall());
     }
 
+    public static String environmentSummary(AppConfig config) {
+        if (config == null) {
+            return "Environment: <not available>";
+        }
+
+        return "Platform: Android"
+                + System.lineSeparator()
+                + "Device name: " + config.deviceName()
+                + System.lineSeparator()
+                + "Platform version: " + config.platformVersion()
+                + System.lineSeparator()
+                + "App package: " + config.appPackage()
+                + System.lineSeparator()
+                + "Skip app install: " + config.skipAppInstall();
+    }
+
     public static void startVideo(AndroidDriver driver, String name) {
         if (!isVideoEnabled() || driver == null) {
             return;

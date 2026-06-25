@@ -21,10 +21,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.0
 
+      - name: Restore Gradle cache
+        uses: actions/cache@v6.0.0
+        with:
+          path: .ci-gradle-cache
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/settings.gradle', '**/gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Prepare Gradle cache directory
+        run: |
+          mkdir -p .ci-gradle-cache
+          sudo chmod -R a+rwX .ci-gradle-cache
+
       - name: Compile with Dockerized Gradle
         run: >
           docker run --rm
           -v "$PWD:/workspace"
+          -v "$PWD/.ci-gradle-cache:/home/gradle/.gradle"
           -w /workspace
           gradle:8-jdk17
           gradle --no-daemon

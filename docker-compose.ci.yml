@@ -1,8 +1,33 @@
 services:
   android:
-    build:
-      args:
-        SOFTWARE_ACCELERATION: "false"
+    image: ${CI_ANDROID_IMAGE:-ghcr.io/natanaelcimato/home-test-mobile-natanael-cimato/android-emulator:ci}
+    build: null
+    pull_policy: always
     privileged: true
     devices:
       - /dev/kvm:/dev/kvm
+
+  tests:
+    volumes:
+      - ./:/workspace
+      - ./.ci-gradle-cache:/home/gradle/.gradle
+
+  tests-cucumber:
+    volumes:
+      - ./:/workspace
+      - ./.ci-gradle-cache:/home/gradle/.gradle
+
+  tests-all:
+    volumes:
+      - ./:/workspace
+      - ./.ci-gradle-cache:/home/gradle/.gradle
+
+  tests-performance:
+    volumes:
+      - ./:/workspace
+      - ./.ci-gradle-cache:/home/gradle/.gradle
+
+  allure-report:
+    volumes:
+      - ./:/workspace
+      - ./.ci-gradle-cache:/home/gradle/.gradle

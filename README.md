@@ -1,6 +1,7 @@
 # Home Test Mobile
 
 [![CI](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/ci.yml)
+[![Android Emulator Image](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/android-image.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/android-image.yml)
 [![E2E Suite](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/mobile-e2e.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/mobile-e2e.yml)
 [![Cucumber Suite](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/cucumber-suite.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/cucumber-suite.yml)
 [![Performance Suite](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/performance-suite.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/performance-suite.yml)
@@ -99,15 +100,17 @@ docker compose down -v
 
 ## GitHub Actions CI
 
-The repository includes four GitHub Actions workflows:
+The repository includes five GitHub Actions workflows:
 
 - `CI`: runs on push and pull request to `main`; compiles all Java source sets with Dockerized Gradle.
+- `Android Emulator Image`: builds and publishes the KVM-enabled emulator image to GitHub Container Registry when Docker image files change.
 - `E2E Suite`: manual workflow that runs the plain JUnit/Appium end-to-end suite.
 - `Cucumber Suite`: manual workflow that runs the Cucumber/Appium suite.
 - `Performance Suite`: manual workflow that runs the mobile performance smoke suite.
 
-The three mobile suite workflows share the reusable `Mobile Suite Runner`, which downloads the APK, starts the Docker Android/Appium stack, runs the selected suite, generates Allure, sends Slack notifications, and uploads test evidence.
+The three mobile suite workflows share the reusable `Mobile Suite Runner`, which downloads the APK, pulls the prebuilt Android/Appium image from GHCR, starts the Docker stack, runs the selected suite, generates Allure, sends Slack notifications, and uploads test evidence.
 In GitHub Actions the runner uses `docker-compose.ci.yml` to enable `/dev/kvm` and keep Android emulator hardware acceleration on. Local Docker runs use the default Compose file, which keeps the Windows-compatible no-KVM fallback.
+CI caches Gradle dependencies in `.ci-gradle-cache` and mounts that cache into Dockerized Gradle containers to avoid repeatedly downloading the same dependencies.
 
 The APK is not committed to git. Configure one of these APK sources before running the mobile workflows:
 
@@ -115,7 +118,7 @@ Option A, recommended when the original release asset has a stable URL:
 
 ```bash
 gh secret set APK_DOWNLOAD_URL --body "https://example.com/path/to/app-home-test-mobile.apk"
-gh variable set APK_SHA256 --body "***REMOVED***"
+gh secret set APK_SHA256 --body "<apk-sha256>"
 ```
 
 Option B, use a GitHub Release asset in this same repository:
@@ -123,8 +126,10 @@ Option B, use a GitHub Release asset in this same repository:
 ```bash
 gh release create mobile-apk app-home-test-mobile.apk --title "Mobile APK" --notes "APK consumed by the mobile suite workflows."
 gh variable set APK_RELEASE_TAG --body "mobile-apk"
-gh variable set APK_SHA256 --body "***REMOVED***"
+gh secret set APK_SHA256 --body "<apk-sha256>"
 ```
+
+The workflow validates the APK checksum without printing either the expected or calculated value in GitHub Actions logs.
 
 Run each mobile workflow from GitHub Actions, or trigger them from the CLI:
 

@@ -1,5 +1,6 @@
 package com.homechallenge.cucumber;
 
+import com.homechallenge.config.AppConfig;
 import com.homechallenge.driver.DriverManager;
 import com.homechallenge.reporting.MobileEvidence;
 import io.appium.java_client.android.AndroidDriver;
@@ -7,10 +8,10 @@ import io.cucumber.java.After;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
 import io.cucumber.java.Scenario;
-import io.qameta.allure.Allure;
 
 public class Hooks {
     private static final ThreadLocal<AndroidDriver> DRIVER = new ThreadLocal<>();
+    private static final ThreadLocal<AppConfig> CONFIG = new ThreadLocal<>();
 
     @Before(order = 0)
     public void startDriver() {
@@ -22,10 +23,7 @@ public class Hooks {
 
     @Before(order = 1)
     public void startEvidence(Scenario scenario) {
-        MobileEvidence.addEnvironmentLabels(com.homechallenge.config.AppConfig.fromEnvironment());
-        Allure.label("framework", "Cucumber");
-        Allure.parameter("featureUri", scenario.getUri().toString());
-        Allure.parameter("featureLine", scenario.getLine());
+        CONFIG.set(AppConfig.fromEnvironment());
         MobileEvidence.startVideo(driver(), scenario.getName());
     }
 
@@ -38,7 +36,11 @@ public class Hooks {
                 + System.lineSeparator()
                 + "Line: " + scenario.getLine()
                 + System.lineSeparator()
-                + "Status: " + scenario.getStatus();
+                + "Status: " + scenario.getStatus()
+                + System.lineSeparator()
+                + "Framework: Cucumber"
+                + System.lineSeparator()
+                + MobileEvidence.environmentSummary(CONFIG.get());
 
         MobileEvidence.attachScenarioDiagnostics(driver, scenarioContext);
         if (scenario.isFailed()) {
@@ -61,5 +63,6 @@ public class Hooks {
     public static void quitDriver() {
         DriverManager.getInstance().quitDriver();
         DRIVER.remove();
+        CONFIG.remove();
     }
 }

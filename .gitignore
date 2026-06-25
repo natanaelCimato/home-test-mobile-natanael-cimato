@@ -1,5 +1,6 @@
 # Build and dependency caches
 .gradle/
+.ci-gradle-cache/
 build/
 out/
 target/
