@@ -90,37 +90,7 @@ jobs:
       - name: Resolve APK
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          if [ -n "${APK_DOWNLOAD_URL:-}" ]; then
-            echo "Downloading APK from APK_DOWNLOAD_URL."
-            curl --fail --location --retry 3 --retry-delay 10 \
-              --output "${APK_FILE}" \
-              "${APK_DOWNLOAD_URL}"
-          else
-            echo "APK_DOWNLOAD_URL is not configured. Downloading ${APK_FILE} from release tag ${APK_RELEASE_TAG}."
-            gh release download "${APK_RELEASE_TAG}" \
-              --repo "${GITHUB_REPOSITORY}" \
-              --pattern "${APK_FILE}" \
-              --dir .
-          fi
-
-          test -s "${APK_FILE}"
-          if [ -z "${EXPECTED_APK_SHA256:-}" ]; then
-            echo "::error::APK_SHA256 secret is required to validate the downloaded APK."
-            exit 1
-          fi
-
-          actual_sha="$(sha256sum "${APK_FILE}" | awk '{print toupper($1)}')"
-          expected_sha="$(echo "${EXPECTED_APK_SHA256}" | tr '[:lower:]' '[:upper:]')"
-
-          if [ "${actual_sha}" != "${expected_sha}" ]; then
-            echo "::error::APK checksum verification failed."
-            exit 1
-          fi
-
-          echo "APK checksum verified."
+        run: bash .github/scripts/resolve-apk.sh
 
       - name: Start Android emulator
         run: |
