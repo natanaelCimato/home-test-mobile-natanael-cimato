@@ -16,6 +16,7 @@ target/
 .env
 .env.*
 local.properties
+.local-notes/
 
 # Mobile binaries and signing material
 *.apk
