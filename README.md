@@ -168,6 +168,10 @@ Notification payloads include:
 - repository, branch, short commit, and actor
 - direct GitHub Actions run/artifact link
 
+Example Slack notifications:
+
+![Slack notification example](src/slack/slack-notification.png)
+
 ## Run Locally Without Docker
 
 If you already have Java 17, Gradle, Android SDK, an Android emulator/device, and Appium 2 installed:
