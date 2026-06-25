@@ -33,12 +33,10 @@ jobs:
           compileCucumberTestJava
           compilePerformanceTestJava
 
-      - name: Notify chat reporters
+      - name: Notify Slack
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
-          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
           NOTIFICATION_STATUS: ${{ job.status }}
           NOTIFICATION_WORKFLOW: ${{ github.workflow }}
           NOTIFICATION_JOB: compile
@@ -49,4 +47,4 @@ jobs:
           NOTIFICATION_ACTOR: ${{ github.actor }}
           NOTIFICATION_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           NOTIFICATION_ARTIFACTS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash .github/scripts/notify-chat.sh
+        run: bash .github/scripts/notify-slack.sh

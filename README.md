@@ -125,16 +125,14 @@ Run the mobile workflow from GitHub Actions and choose one suite:
 
 Allure results, screenshots, animated recordings, JUnit/Cucumber reports, and Docker logs are uploaded as workflow artifacts.
 
-### Chat Notifications
+### Slack Notifications
 
-Both workflows can notify Slack, Google Chat, and Microsoft Teams through incoming webhooks. Notifications are optional: if a secret is missing, that reporter is skipped and the workflow continues.
+Both workflows can notify Slack through an incoming webhook. Notifications are optional: if the secret is missing, the Slack reporter is skipped and the workflow continues.
 
-Configure any combination of these secrets:
+Configure this secret:
 
 ```bash
 gh secret set SLACK_WEBHOOK_URL --body "https://hooks.slack.com/services/..."
-gh secret set GOOGLE_CHAT_WEBHOOK_URL --body "https://chat.googleapis.com/v1/spaces/..."
-gh secret set TEAMS_WEBHOOK_URL --body "https://..."
 ```
 
 Notification payloads include:
