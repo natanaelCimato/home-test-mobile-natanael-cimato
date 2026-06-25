@@ -5,12 +5,16 @@ import io.appium.java_client.android.AndroidDriver;
 import io.qameta.allure.Step;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoAlertPresentException;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 
 public final class NativeAlert {
+    private static final Duration ALERT_TIMEOUT = Duration.ofSeconds(8);
+
     private final AndroidDriver driver;
 
     public NativeAlert(AndroidDriver driver) {
@@ -20,7 +24,10 @@ public final class NativeAlert {
     @Step("Validate native alert contains: {expectedMessage}")
     public boolean isMessageDisplayed(String expectedMessage) {
         try {
-            return new WebDriverWait(driver, Duration.ofSeconds(10)).until(currentDriver -> {
+            WebDriverWait wait = new WebDriverWait(driver, ALERT_TIMEOUT);
+            wait.ignoring(StaleElementReferenceException.class);
+
+            return wait.until(currentDriver -> {
                 try {
                     String alertText = currentDriver.switchTo().alert().getText();
                     if (alertText != null && alertText.contains(expectedMessage)) {
@@ -30,7 +37,7 @@ public final class NativeAlert {
                     // Fall through to native text lookup.
                 }
 
-                return !currentDriver.findElements(containsTextLocator(expectedMessage)).isEmpty();
+                return firstDisplayed(containsTextLocator(expectedMessage)) != null;
             });
         } catch (TimeoutException exception) {
             return false;
@@ -47,8 +54,9 @@ public final class NativeAlert {
         }
 
         for (String buttonText : new String[]{"OK", "Ok", "Aceptar"}) {
-            if (!driver.findElements(AppiumBy.xpath("//*[@text=" + BasePage.xpathLiteral(buttonText) + "]")).isEmpty()) {
-                driver.findElement(AppiumBy.xpath("//*[@text=" + BasePage.xpathLiteral(buttonText) + "]")).click();
+            WebElement button = firstDisplayed(AppiumBy.xpath("//*[@text=" + BasePage.xpathLiteral(buttonText) + "]"));
+            if (button != null) {
+                button.click();
                 return;
             }
         }
@@ -57,5 +65,19 @@ public final class NativeAlert {
     private By containsTextLocator(String expectedMessage) {
         String literal = BasePage.xpathLiteral(expectedMessage);
         return AppiumBy.xpath("//*[contains(@text, " + literal + ") or contains(@content-desc, " + literal + ")]");
+    }
+
+    private WebElement firstDisplayed(By locator) {
+        for (WebElement element : driver.findElements(locator)) {
+            try {
+                if (element.isDisplayed()) {
+                    return element;
+                }
+            } catch (StaleElementReferenceException ignored) {
+                // Native dialogs can redraw while Appium is reading the hierarchy.
+            }
+        }
+
+        return null;
     }
 }

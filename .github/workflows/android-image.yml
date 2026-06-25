@@ -10,12 +10,13 @@ on:
       - .github/workflows/android-image.yml
   workflow_dispatch:
 
+concurrency:
+  group: android-image-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
-
-env:
-  IMAGE_NAME: ghcr.io/natanaelcimato/home-test-mobile-natanael-cimato/android-emulator
 
 jobs:
   build:
@@ -26,6 +27,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Resolve image name
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="${GITHUB_REPOSITORY,,}"
+          image_name="ghcr.io/${repository}/android-emulator"
+          echo "image_name=${image_name}" >> "${GITHUB_OUTPUT}"
+          echo "Building ${image_name}:ci"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.1.0
@@ -40,13 +53,17 @@ jobs:
       - name: Build and push CI image
         uses: docker/build-push-action@v7.2.0
         with:
-          context: .
+          context: docker/android
           file: docker/android/Dockerfile
           push: true
+          pull: true
           build-args: |
             SOFTWARE_ACCELERATION=false
           tags: |
-            ${{ env.IMAGE_NAME }}:ci
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ steps.image.outputs.image_name }}:ci
+            ${{ steps.image.outputs.image_name }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=android-emulator
+          cache-to: type=gha,mode=max,scope=android-emulator

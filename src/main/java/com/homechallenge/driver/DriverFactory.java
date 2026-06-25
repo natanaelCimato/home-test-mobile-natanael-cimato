@@ -11,8 +11,10 @@ public final class DriverFactory {
     }
 
     public static AndroidDriver createDriver() {
-        AppConfig config = AppConfig.fromEnvironment();
+        return createDriver(AppConfig.fromEnvironment());
+    }
 
+    static AndroidDriver createDriver(AppConfig config) {
         UiAutomator2Options options = new UiAutomator2Options()
                 .setPlatformName("Android")
                 .setAutomationName("UiAutomator2")

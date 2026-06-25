@@ -10,11 +10,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith({DriverLifecycleExtension.class, MobileEvidenceExtension.class})
 abstract class BasePerformanceTest {
     protected AndroidDriver driver;
+    protected DriverManager driverManager;
 
     @BeforeEach
     void setUp() {
-        DriverManager driverManager = DriverManager.getInstance();
-        driver = driverManager.getDriver();
-        driverManager.resetApplicationState();
+        driverManager = DriverManager.getInstance();
+        driver = resetApplication();
+    }
+
+    protected AndroidDriver resetApplication() {
+        driver = driverManager.resetApplicationState();
+        return driver;
     }
 }

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 public final class MobileEvidenceExtension implements BeforeTestExecutionCallback, AfterTestExecutionCallback {
     @Override
     public void beforeTestExecution(ExtensionContext context) {
-        AppConfig config = AppConfig.fromEnvironment();
+        AppConfig config = DriverManager.getInstance().config();
         MobileEvidence.addEnvironmentLabels(config);
         Allure.label("framework", "JUnit 5");
         Allure.parameter("testClass", context.getRequiredTestClass().getName());
@@ -26,11 +26,14 @@ public final class MobileEvidenceExtension implements BeforeTestExecutionCallbac
     public void afterTestExecution(ExtensionContext context) {
         AndroidDriver driver = DriverManager.getInstance().currentDriver();
         String displayName = context.getDisplayName();
+        boolean failed = context.getExecutionException().isPresent();
 
         context.getExecutionException().ifPresent(throwable ->
                 MobileEvidence.attachFailureDiagnostics(driver, displayName, throwable));
 
-        MobileEvidence.attachFinalScreenshot(driver, "final-screenshot - " + displayName);
+        if (MobileEvidence.shouldAttachFinalScreenshot(failed)) {
+            MobileEvidence.attachFinalScreenshot(driver, "final-screenshot - " + displayName);
+        }
         MobileEvidence.stopVideo(driver, "screen-recording - " + displayName);
     }
 }

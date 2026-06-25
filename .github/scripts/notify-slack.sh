@@ -12,6 +12,10 @@ actor="${NOTIFICATION_ACTOR:-unknown}"
 run_url="${NOTIFICATION_RUN_URL:-}"
 artifacts_url="${NOTIFICATION_ARTIFACTS_URL:-${run_url}}"
 
+if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+  echo "::add-mask::${SLACK_WEBHOOK_URL}"
+fi
+
 short_sha="${sha:0:7}"
 title="[${status}] ${workflow} / ${job}"
 summary="${title} - ${repository}@${branch} (${short_sha})"
@@ -44,7 +48,8 @@ if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
   exit 0
 fi
 
-payload="${RUNNER_TEMP:-/tmp}/slack-payload-${GITHUB_RUN_ID:-local}.json"
+payload="$(mktemp "${RUNNER_TEMP:-/tmp}/slack-payload.XXXXXX.json")"
+trap 'rm -f "${payload}"' EXIT
 
 TITLE="${title}" \
 SUMMARY="${summary}" \
@@ -72,6 +77,9 @@ print(json.dumps(payload))
 PY
 
 if curl --fail --silent --show-error --retry 2 --retry-delay 5 \
+  --retry-all-errors \
+  --connect-timeout 10 \
+  --max-time 30 \
   -H "Content-Type: application/json" \
   --data @"${payload}" \
   "${SLACK_WEBHOOK_URL}" >/dev/null; then

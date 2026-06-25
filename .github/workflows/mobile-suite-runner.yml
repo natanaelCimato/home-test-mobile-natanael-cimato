@@ -35,7 +35,8 @@ env:
   APK_RELEASE_TAG: ${{ vars.APK_RELEASE_TAG || 'mobile-apk' }}
   APK_DOWNLOAD_URL: ${{ secrets.APK_DOWNLOAD_URL || vars.APK_DOWNLOAD_URL }}
   EXPECTED_APK_SHA256: ${{ secrets.APK_SHA256 }}
-  CI_ANDROID_IMAGE: ghcr.io/natanaelcimato/home-test-mobile-natanael-cimato/android-emulator:ci
+  CI_ANDROID_IMAGE: ${{ vars.CI_ANDROID_IMAGE }}
+  DOCKER_BUILDKIT: "1"
 
 jobs:
   mobile:
@@ -46,17 +47,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Show Docker versions
         run: |
           docker version
           docker compose version
 
+      - name: Resolve CI Android image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${CI_ANDROID_IMAGE:-}" ]; then
+            image="${CI_ANDROID_IMAGE}"
+          else
+            repository="${GITHUB_REPOSITORY,,}"
+            image="ghcr.io/${repository}/android-emulator:ci"
+          fi
+
+          echo "CI_ANDROID_IMAGE=${image}" >> "${GITHUB_ENV}"
+          echo "Using Android image ${image}"
+
       - name: Restore Gradle cache
         uses: actions/cache@v6.0.0
         with:
-          path: .ci-gradle-cache
-          key: gradle-${{ runner.os }}-${{ hashFiles('build.gradle', 'settings.gradle') }}
+          path: |
+            .ci-gradle-cache/caches/modules-2
+            .ci-gradle-cache/caches/jars-*
+            .ci-gradle-cache/caches/transforms-*
+            .ci-gradle-cache/caches/build-cache-*
+            .ci-gradle-cache/caches/*/generated-gradle-jars
+            .ci-gradle-cache/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('build.gradle', 'settings.gradle', 'gradle.properties', 'gradle/**/*.toml', '**/build.gradle', '**/build.gradle.kts') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
@@ -92,11 +116,35 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/resolve-apk.sh
 
+      - name: Pull or build Android image
+        run: |
+          set -euo pipefail
+          mkdir -p build/ci-diagnostics
+
+          compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
+          image_source="pulled"
+
+          if ! "${compose[@]}" pull android; then
+            echo "::warning::Could not pull ${CI_ANDROID_IMAGE}; building the CI Android image locally."
+            docker build --pull \
+              --build-arg SOFTWARE_ACCELERATION=false \
+              --tag "${CI_ANDROID_IMAGE}" \
+              -f docker/android/Dockerfile \
+              .
+            image_source="built-local"
+          fi
+
+          {
+            echo "CI_ANDROID_IMAGE=${CI_ANDROID_IMAGE}"
+            echo "IMAGE_SOURCE=${image_source}"
+            docker image inspect "${CI_ANDROID_IMAGE}" --format 'IMAGE_ID={{.Id}}'
+            docker image inspect "${CI_ANDROID_IMAGE}" --format 'REPO_DIGESTS={{json .RepoDigests}}'
+          } > build/ci-diagnostics/android-image.txt
+
       - name: Start Android emulator
         run: |
           set -euo pipefail
           compose=(docker compose -f docker-compose.yml -f docker-compose.ci.yml)
-          "${compose[@]}" pull android
           "${compose[@]}" up -d --no-build android
 
       - name: Wait for Android emulator
@@ -113,13 +161,14 @@ jobs:
               exit 0
             fi
 
-            "${compose[@]}" logs --no-color --tail=80 android || true
+            "${compose[@]}" logs --no-color --tail=50 android || true
             sleep 30
           done
 
           echo "::error::Android emulator did not become healthy within 30 minutes."
-          docker inspect home-test-mobile-android || true
-          "${compose[@]}" logs --no-color android || true
+          mkdir -p build/ci-diagnostics
+          docker inspect home-test-mobile-android > build/ci-diagnostics/android-inspect-timeout.json || true
+          "${compose[@]}" logs --no-color --tail=300 android || true
           exit 1
 
       - name: Run ${{ inputs.suite }} suite
@@ -148,7 +197,10 @@ jobs:
           sudo mkdir -p build/ci-diagnostics
           sudo chmod -R a+rwX build
           docker compose -f docker-compose.yml -f docker-compose.ci.yml ps > build/ci-diagnostics/docker-compose-ps.txt || true
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > build/ci-diagnostics/docker-compose.log || true
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color --timestamps > build/ci-diagnostics/docker-compose.log || true
+          docker inspect home-test-mobile-android > build/ci-diagnostics/android-inspect.json || true
+          docker image inspect "${CI_ANDROID_IMAGE}" > build/ci-diagnostics/android-image-inspect.json || true
+          docker system df > build/ci-diagnostics/docker-system-df.txt || true
 
       - name: Generate Allure report
         if: always()
@@ -166,13 +218,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: ${{ inputs.artifact_prefix }}-${{ github.run_number }}
+          name: ${{ inputs.artifact_prefix }}-${{ github.run_number }}-attempt-${{ github.run_attempt }}
           path: |
             build/allure-results/**
             build/reports/**
             build/test-results/**
             build/ci-diagnostics/**
           if-no-files-found: warn
+          compression-level: 1
           retention-days: 14
 
       - name: Stop Docker environment

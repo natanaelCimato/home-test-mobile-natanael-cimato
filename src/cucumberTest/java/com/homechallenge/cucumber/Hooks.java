@@ -16,14 +16,13 @@ public class Hooks {
     @Before(order = 0)
     public void startDriver() {
         DriverManager driverManager = DriverManager.getInstance();
-        AndroidDriver driver = driverManager.getDriver();
-        driverManager.resetApplicationState();
+        AndroidDriver driver = driverManager.resetApplicationState();
         DRIVER.set(driver);
     }
 
     @Before(order = 1)
     public void startEvidence(Scenario scenario) {
-        CONFIG.set(AppConfig.fromEnvironment());
+        CONFIG.set(DriverManager.getInstance().config());
         MobileEvidence.startVideo(driver(), scenario.getName());
     }
 
@@ -47,8 +46,16 @@ public class Hooks {
             MobileEvidence.attachFailureDiagnostics(driver, scenarioContext, null);
         }
 
-        MobileEvidence.attachFinalScreenshot(driver, "final-screenshot - " + scenario.getName());
+        if (MobileEvidence.shouldAttachFinalScreenshot(scenario.isFailed())) {
+            MobileEvidence.attachFinalScreenshot(driver, "final-screenshot - " + scenario.getName());
+        }
         MobileEvidence.stopVideo(driver, "screen-recording - " + scenario.getName());
+    }
+
+    @After(order = 0)
+    public void clearScenarioContext() {
+        DRIVER.remove();
+        CONFIG.remove();
     }
 
     public static AndroidDriver driver() {
@@ -62,7 +69,5 @@ public class Hooks {
     @AfterAll
     public static void quitDriver() {
         DriverManager.getInstance().quitDriver();
-        DRIVER.remove();
-        CONFIG.remove();
     }
 }

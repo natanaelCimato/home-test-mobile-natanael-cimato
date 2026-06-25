@@ -84,6 +84,44 @@ allure {
     version = allureCommandlineVersion
 }
 
+def configuredValue = { String propertyName, String environmentName, String defaultValue ->
+    def propertyValue = System.getProperty(propertyName)
+    if (propertyValue != null && !propertyValue.trim().isEmpty()) {
+        return propertyValue
+    }
+
+    def environmentValue = System.getenv(environmentName)
+    if (environmentValue != null && !environmentValue.trim().isEmpty()) {
+        return environmentValue
+    }
+
+    return defaultValue
+}
+
+def configuredBudgetMillis = { String propertyName, String environmentName, String legacySecondsPropertyName, String legacySecondsEnvironmentName, String defaultValue ->
+    def directValue = System.getProperty(propertyName)
+    if (directValue != null && !directValue.trim().isEmpty()) {
+        return directValue
+    }
+
+    directValue = System.getenv(environmentName)
+    if (directValue != null && !directValue.trim().isEmpty()) {
+        return directValue
+    }
+
+    def legacyValue = System.getProperty(legacySecondsPropertyName)
+    if (legacyValue != null && !legacyValue.trim().isEmpty()) {
+        return (legacyValue.toLong() * 1000L).toString()
+    }
+
+    legacyValue = System.getenv(legacySecondsEnvironmentName)
+    if (legacyValue != null && !legacyValue.trim().isEmpty()) {
+        return (legacyValue.toLong() * 1000L).toString()
+    }
+
+    return defaultValue
+}
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     maxParallelForks = 1
@@ -96,8 +134,6 @@ tasks.withType(Test).configureEach {
     systemProperty 'allure.results.directory', System.getProperty('allure.results.directory', file("$buildDir/allure-results").absolutePath)
     systemProperty 'evidence.video.enabled', System.getProperty('evidence.video.enabled', System.getenv('RECORD_VIDEO') ?: 'false')
     systemProperty 'evidence.video.maxSeconds', System.getProperty('evidence.video.maxSeconds', System.getenv('VIDEO_TIME_LIMIT_SECONDS') ?: '180')
-    systemProperty 'performance.loginBudgetSeconds', System.getProperty('performance.loginBudgetSeconds', System.getenv('PERF_LOGIN_BUDGET_SECONDS') ?: '600')
-    systemProperty 'performance.catalogBudgetSeconds', System.getProperty('performance.catalogBudgetSeconds', System.getenv('PERF_CATALOG_BUDGET_SECONDS') ?: '420')
 
     testLogging {
         events = ['PASSED', 'FAILED', 'SKIPPED']
@@ -122,11 +158,46 @@ tasks.register('cucumberTest', Test) {
 }
 
 tasks.register('performanceTest', Test) {
-    description = 'Runs Appium performance smoke tests with generous Docker software-emulator budgets.'
+    description = 'Runs Appium performance smoke tests with repeated samples and configurable budgets.'
     group = 'verification'
     testClassesDirs = sourceSets.performanceTest.output.classesDirs
     classpath = sourceSets.performanceTest.runtimeClasspath
     shouldRunAfter tasks.named('test')
+    outputs.upToDateWhen { false }
+
+    systemProperty 'performance.sampleCount', configuredValue('performance.sampleCount', 'PERF_SAMPLE_COUNT', '3')
+    systemProperty 'performance.warmupIterations', configuredValue('performance.warmupIterations', 'PERF_WARMUP_ITERATIONS', '1')
+    systemProperty 'performance.assertionMetric', configuredValue('performance.assertionMetric', 'PERF_ASSERTION_METRIC', 'median')
+    systemProperty 'performance.collectDeviceEvidence', configuredValue('performance.collectDeviceEvidence', 'PERF_COLLECT_DEVICE_EVIDENCE', 'true')
+    systemProperty 'performance.reportDirectory', configuredValue(
+            'performance.reportDirectory',
+            'PERF_REPORT_DIR',
+            file("$buildDir/reports/performance").absolutePath
+    )
+    systemProperty 'performance.loginSubmitBudgetMs', configuredBudgetMillis(
+            'performance.loginSubmitBudgetMs',
+            'PERF_LOGIN_SUBMIT_BUDGET_MS',
+            'performance.loginBudgetSeconds',
+            'PERF_LOGIN_BUDGET_SECONDS',
+            '600000'
+    )
+    systemProperty 'performance.catalogItemOpenBudgetMs', configuredBudgetMillis(
+            'performance.catalogItemOpenBudgetMs',
+            'PERF_CATALOG_ITEM_OPEN_BUDGET_MS',
+            'performance.catalogBudgetSeconds',
+            'PERF_CATALOG_BUDGET_SECONDS',
+            '420000'
+    )
+    systemProperty 'performance.loginSubmitTargetMs', configuredValue(
+            'performance.loginSubmitTargetMs',
+            'PERF_LOGIN_SUBMIT_TARGET_MS',
+            '60000'
+    )
+    systemProperty 'performance.catalogItemOpenTargetMs', configuredValue(
+            'performance.catalogItemOpenTargetMs',
+            'PERF_CATALOG_ITEM_OPEN_TARGET_MS',
+            '90000'
+    )
 }
 
 tasks.register('allMobileTests') {

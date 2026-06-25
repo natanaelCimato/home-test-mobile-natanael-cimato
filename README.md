@@ -110,9 +110,10 @@ The repository includes five GitHub Actions workflows:
 
 The three mobile suite workflows share the reusable `Mobile Suite Runner`, which downloads the APK, pulls the prebuilt Android/Appium image from GHCR, starts the Docker stack, runs the selected suite, generates Allure, sends Slack notifications, and uploads test evidence.
 In GitHub Actions the runner uses `docker-compose.ci.yml` to enable `/dev/kvm` and keep Android emulator hardware acceleration on. Local Docker runs use the default Compose file, which keeps the Windows-compatible no-KVM fallback.
-CI caches Gradle dependencies in `.ci-gradle-cache` and mounts that cache into Dockerized Gradle containers to avoid repeatedly downloading the same dependencies.
+CI caches Gradle dependencies and build-cache entries in `.ci-gradle-cache` and mounts that cache into Dockerized Gradle containers to avoid repeatedly downloading or rebuilding the same inputs.
+The default GHCR image is resolved from the current repository name in lowercase. Set the repository variable `CI_ANDROID_IMAGE` only if the mobile workflows should consume an image from another GHCR package. If the image pull fails, the mobile runner builds the CI image locally with KVM acceleration enabled and stores the image metadata with the workflow evidence.
 
-The APK is not committed to git. Configure one of these APK sources before running the mobile workflows:
+The APK is not committed to git. Configure one of these APK sources before running the mobile workflows. Remote APK URLs must use `https://`, and the workflow masks the configured URL and checksum before download/validation.
 
 Option A, recommended when the original release asset has a stable URL:
 
@@ -145,7 +146,7 @@ Available suite workflows:
 - `Cucumber Suite`: BDD implementation
 - `Performance Suite`: login and deep-catalog timing checks
 
-Allure results, screenshots, animated recordings, JUnit/Cucumber reports, and Docker logs are uploaded as workflow artifacts.
+Allure results, screenshots, animated recordings, JUnit/Cucumber reports, Docker diagnostics, APK metadata, and Android image metadata are uploaded as workflow artifacts. Large Docker logs are kept in artifacts; the live job log only tails emulator startup output for triage.
 
 ### Slack Notifications
 

@@ -2,32 +2,42 @@ services:
   android:
     image: ${CI_ANDROID_IMAGE:-ghcr.io/natanaelcimato/home-test-mobile-natanael-cimato/android-emulator:ci}
     build: null
-    pull_policy: always
+    pull_policy: missing
     privileged: true
     devices:
       - /dev/kvm:/dev/kvm
 
   tests:
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false"
     volumes:
       - ./:/workspace
       - ./.ci-gradle-cache:/home/gradle/.gradle
 
   tests-cucumber:
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false"
     volumes:
       - ./:/workspace
       - ./.ci-gradle-cache:/home/gradle/.gradle
 
   tests-all:
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false"
     volumes:
       - ./:/workspace
       - ./.ci-gradle-cache:/home/gradle/.gradle
 
   tests-performance:
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false"
     volumes:
       - ./:/workspace
       - ./.ci-gradle-cache:/home/gradle/.gradle
 
   allure-report:
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false"
     volumes:
       - ./:/workspace
       - ./.ci-gradle-cache:/home/gradle/.gradle

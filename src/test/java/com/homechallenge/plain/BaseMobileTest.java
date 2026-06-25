@@ -14,7 +14,6 @@ public abstract class BaseMobileTest {
     @BeforeEach
     void setUp() {
         DriverManager driverManager = DriverManager.getInstance();
-        driver = driverManager.getDriver();
-        driverManager.resetApplicationState();
+        driver = driverManager.resetApplicationState();
     }
 }

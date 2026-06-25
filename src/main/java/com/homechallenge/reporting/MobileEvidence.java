@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -105,6 +106,19 @@ public final class MobileEvidence {
         } catch (Exception exception) {
             attachText("Screenshot failed - " + name, exception.toString());
         }
+    }
+
+    public static boolean shouldAttachFinalScreenshot(boolean failed) {
+        String mode = value("evidence.screenshot.mode", "EVIDENCE_SCREENSHOT_MODE", "failure")
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        return switch (mode) {
+            case "always", "all" -> true;
+            case "never", "none", "off" -> false;
+            case "failure", "failures", "on_failure", "on-failure" -> failed;
+            default -> failed;
+        };
     }
 
     public static void attachPageSource(AndroidDriver driver, String name) {

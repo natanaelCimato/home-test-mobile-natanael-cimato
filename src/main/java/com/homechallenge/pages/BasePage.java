@@ -1,16 +1,21 @@
 package com.homechallenge.pages;
 
 import com.homechallenge.config.AppConfig;
+import com.homechallenge.driver.DriverManager;
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.android.AndroidDriver;
 import org.openqa.selenium.By;
+import org.openqa.selenium.ElementNotInteractableException;
+import org.openqa.selenium.InvalidElementStateException;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.TimeoutException;
-import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
+import java.util.function.Supplier;
 
 public abstract class BasePage<T extends BasePage<T>> {
     protected final AndroidDriver driver;
@@ -20,52 +25,35 @@ public abstract class BasePage<T extends BasePage<T>> {
 
     protected BasePage(AndroidDriver driver) {
         this.driver = driver;
-        this.config = AppConfig.fromEnvironment();
-        this.wait = new WebDriverWait(driver, config.waitTimeout());
-        this.wait.ignoring(StaleElementReferenceException.class);
-        this.wait.ignoring(WebDriverException.class);
+        this.config = DriverManager.getInstance().config();
+        this.wait = createWait(config.waitTimeout());
     }
 
     public abstract T waitForLoaded();
 
     protected WebElement findByAccessibilityId(String accessibilityId) {
-        return wait.until(currentDriver -> {
+        return findByAccessibilityId(accessibilityId, config.waitTimeout());
+    }
+
+    protected WebElement findByAccessibilityId(String accessibilityId, Duration timeout) {
+        By[] locators = accessibilityLocators(accessibilityId);
+
+        return createWait(timeout).until(currentDriver -> {
             dismissBlockingSystemDialogs();
-
-            By[] locators = new By[]{
-                    AppiumBy.accessibilityId(accessibilityId),
-                    AppiumBy.id(accessibilityId),
-                    AppiumBy.xpath("//*[@resource-id=" + xpathLiteral(accessibilityId)
-                            + " or @content-desc=" + xpathLiteral(accessibilityId) + "]")
-            };
-
-            for (By locator : locators) {
-                for (WebElement element : currentDriver.findElements(locator)) {
-                    try {
-                        if (element.isDisplayed()) {
-                            return element;
-                        }
-                    } catch (StaleElementReferenceException ignored) {
-                        // React Native can redraw between lookup and visibility checks.
-                    }
-                }
-            }
-
-            return null;
+            return firstDisplayed(currentDriver, locators);
         });
     }
 
     protected void tapAccessibilityId(String accessibilityId) {
-        findByAccessibilityId(accessibilityId).click();
+        clickWithRetry(() -> findByAccessibilityId(accessibilityId));
     }
 
     protected void tapAccessibilityIdOrText(String accessibilityId, String text) {
-        if (isVisible(AppiumBy.xpath("//*[@resource-id=" + xpathLiteral(accessibilityId)
-                + " or @content-desc=" + xpathLiteral(accessibilityId) + "]"), Duration.ofSeconds(3))) {
-            tapAccessibilityId(accessibilityId);
-        } else {
-            tapText(text);
+        if (tapAccessibilityIdIfVisible(accessibilityId, Duration.ofSeconds(2))) {
+            return;
         }
+
+        tapText(text);
     }
 
     protected void typeByAccessibilityId(String accessibilityId, String value) {
@@ -79,12 +67,12 @@ public abstract class BasePage<T extends BasePage<T>> {
                 field.sendKeys(value);
                 hideKeyboardIfShown();
                 return;
-            } catch (TimeoutException exception) {
-                lastException = exception;
-                hideKeyboardIfShown();
-            } catch (StaleElementReferenceException exception) {
+            } catch (TimeoutException
+                     | StaleElementReferenceException
+                     | InvalidElementStateException exception) {
                 lastException = exception;
                 sleepBriefly();
+                hideKeyboardIfShown();
             }
         }
 
@@ -92,25 +80,16 @@ public abstract class BasePage<T extends BasePage<T>> {
     }
 
     protected WebElement findText(String text) {
+        By locator = textLocator(text);
+
         return wait.until(currentDriver -> {
             dismissBlockingSystemDialogs();
-
-            for (WebElement element : currentDriver.findElements(textLocator(text))) {
-                try {
-                    if (element.isDisplayed()) {
-                        return element;
-                    }
-                } catch (StaleElementReferenceException ignored) {
-                    // Keep polling until UiAutomator2 returns a fresh element.
-                }
-            }
-
-            return null;
+            return firstDisplayed(currentDriver, locator);
         });
     }
 
     protected void tapText(String text) {
-        findText(text).click();
+        clickWithRetry(() -> findText(text));
     }
 
     protected boolean isTextVisible(String text) {
@@ -127,23 +106,9 @@ public abstract class BasePage<T extends BasePage<T>> {
 
     protected boolean isVisible(By locator, Duration timeout) {
         try {
-            WebDriverWait shortWait = new WebDriverWait(driver, timeout);
-            shortWait.ignoring(StaleElementReferenceException.class);
-            shortWait.ignoring(WebDriverException.class);
-            shortWait.until(currentDriver -> {
+            createWait(timeout).until(currentDriver -> {
                 dismissBlockingSystemDialogs();
-
-                for (WebElement element : currentDriver.findElements(locator)) {
-                    try {
-                        if (element.isDisplayed()) {
-                            return element;
-                        }
-                    } catch (StaleElementReferenceException ignored) {
-                        // Keep polling until UiAutomator2 returns a fresh element.
-                    }
-                }
-
-                return null;
+                return firstDisplayed(currentDriver, locator);
             });
             return true;
         } catch (TimeoutException exception) {
@@ -209,12 +174,11 @@ public abstract class BasePage<T extends BasePage<T>> {
 
     private boolean tapFirstVisible(By locator) {
         try {
-            for (WebElement element : driver.findElements(locator)) {
-                if (element.isDisplayed()) {
-                    element.click();
-                    sleepBriefly();
-                    return true;
-                }
+            WebElement element = firstDisplayed(driver, locator);
+            if (element != null) {
+                element.click();
+                sleepBriefly();
+                return true;
             }
         } catch (Exception ignored) {
             // The system dialog can disappear between lookup and click.
@@ -248,5 +212,71 @@ public abstract class BasePage<T extends BasePage<T>> {
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private WebDriverWait createWait(Duration timeout) {
+        WebDriverWait driverWait = new WebDriverWait(driver, timeout);
+        driverWait.ignoring(StaleElementReferenceException.class, NoSuchElementException.class);
+        return driverWait;
+    }
+
+    private By[] accessibilityLocators(String accessibilityId) {
+        String literal = xpathLiteral(accessibilityId);
+        return new By[]{
+                AppiumBy.accessibilityId(accessibilityId),
+                AppiumBy.id(accessibilityId),
+                AppiumBy.xpath("//*[@resource-id=" + literal + " or @content-desc=" + literal + "]")
+        };
+    }
+
+    private WebElement firstDisplayed(SearchContext context, By locator) {
+        for (WebElement element : context.findElements(locator)) {
+            try {
+                if (element.isDisplayed()) {
+                    return element;
+                }
+            } catch (StaleElementReferenceException ignored) {
+                // React Native can redraw between lookup and visibility checks.
+            }
+        }
+
+        return null;
+    }
+
+    private WebElement firstDisplayed(SearchContext context, By[] locators) {
+        for (By locator : locators) {
+            WebElement element = firstDisplayed(context, locator);
+            if (element != null) {
+                return element;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean tapAccessibilityIdIfVisible(String accessibilityId, Duration timeout) {
+        try {
+            clickWithRetry(() -> findByAccessibilityId(accessibilityId, timeout));
+            return true;
+        } catch (TimeoutException exception) {
+            return false;
+        }
+    }
+
+    private void clickWithRetry(Supplier<WebElement> elementSupplier) {
+        RuntimeException lastException = null;
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                elementSupplier.get().click();
+                return;
+            } catch (StaleElementReferenceException
+                     | ElementNotInteractableException exception) {
+                lastException = exception;
+                sleepBriefly();
+            }
+        }
+
+        throw lastException;
     }
 }
