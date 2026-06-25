@@ -1,5 +1,10 @@
 # Home Test Mobile
 
+[![CI](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/ci.yml)
+[![E2E Suite](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/mobile-e2e.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/mobile-e2e.yml)
+[![Cucumber Suite](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/cucumber-suite.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/cucumber-suite.yml)
+[![Performance Suite](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/performance-suite.yml/badge.svg?branch=main)](https://github.com/natanaelCimato/home-test-mobile-natanael-cimato/actions/workflows/performance-suite.yml)
+
 Mobile automation challenge for the Android APK `app-home-test-mobile.apk`.
 
 The project contains two implementations over the same Appium page objects:
