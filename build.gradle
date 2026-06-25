@@ -165,10 +165,10 @@ tasks.register('performanceTest', Test) {
     shouldRunAfter tasks.named('test')
     outputs.upToDateWhen { false }
 
-    systemProperty 'performance.sampleCount', configuredValue('performance.sampleCount', 'PERF_SAMPLE_COUNT', '3')
-    systemProperty 'performance.warmupIterations', configuredValue('performance.warmupIterations', 'PERF_WARMUP_ITERATIONS', '1')
+    systemProperty 'performance.sampleCount', configuredValue('performance.sampleCount', 'PERF_SAMPLE_COUNT', '1')
+    systemProperty 'performance.warmupIterations', configuredValue('performance.warmupIterations', 'PERF_WARMUP_ITERATIONS', '0')
     systemProperty 'performance.assertionMetric', configuredValue('performance.assertionMetric', 'PERF_ASSERTION_METRIC', 'median')
-    systemProperty 'performance.collectDeviceEvidence', configuredValue('performance.collectDeviceEvidence', 'PERF_COLLECT_DEVICE_EVIDENCE', 'true')
+    systemProperty 'performance.collectDeviceEvidence', configuredValue('performance.collectDeviceEvidence', 'PERF_COLLECT_DEVICE_EVIDENCE', 'false')
     systemProperty 'performance.reportDirectory', configuredValue(
             'performance.reportDirectory',
             'PERF_REPORT_DIR',

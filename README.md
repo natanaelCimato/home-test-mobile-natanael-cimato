@@ -63,6 +63,8 @@ Run the performance smoke suite:
 docker compose --profile performance run --rm tests-performance
 ```
 
+The Docker performance profile is tuned as a smoke check by default: `PERF_SAMPLE_COUNT=1`, `PERF_WARMUP_ITERATIONS=0`, and `PERF_COLLECT_DEVICE_EVIDENCE=false`. Increase those values only when you want a deeper local performance run.
+
 Generate the Allure HTML report after any run:
 
 ```bash
@@ -206,7 +208,7 @@ gradle clean test
 
 ## Performance Tests
 
-The performance suite is intentionally separate from the functional suite because Android software emulation on Windows can be slow and noisy.
+The performance suite is intentionally separate from the functional suite because Android software emulation on Windows can be slow and noisy. CI runs it as a fast smoke check, while deeper sampling is opt-in.
 
 - Login performance: valid credentials should reach the catalog within `PERF_LOGIN_BUDGET_SECONDS` (Docker default: `600`)
 - Catalog performance: opening `Twilight Glow` should complete within `PERF_CATALOG_BUDGET_SECONDS` (Docker default: `420`)
@@ -215,6 +217,12 @@ Budgets can be tightened on a machine with KVM/hardware acceleration:
 
 ```bash
 PERF_LOGIN_BUDGET_SECONDS=60 PERF_CATALOG_BUDGET_SECONDS=90 docker compose --profile performance run --rm tests-performance
+```
+
+For a deeper local performance run with warmup and device diagnostics:
+
+```bash
+PERF_SAMPLE_COUNT=3 PERF_WARMUP_ITERATIONS=1 PERF_COLLECT_DEVICE_EVIDENCE=true docker compose --profile performance run --rm tests-performance
 ```
 
 ## Evidence And Diagnostics
